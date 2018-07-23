@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Photoscann extractor</title>
+	<meta name="viewport" content="width=3000, user-scalable=1">
+</head>
+<body>
+	<style type="text/css">
+		body {
+			background: #eee;
+			margin: 0;
+			padding: 0;
+			--transform: scale(.4);
+		}
+		.originalImageCanvas, .UICanvas {
+			position: absolute;
+			left: 0;
+			top: 0;
+		}
+	</style>
+	
+	<canvas class="originalImageCanvas"></canvas>
+	<canvas class="UICanvas"></canvas>
+
+	<script type="text/javascript" src="get-rectangle-bounding-box.js"></script>
+
+	<script type="text/javascript">
+		const loadImage = (src) => {
+			return new Promise((resolve) => {
+				const image = new Image()
+				image.src = src
+				image.onload = () => {
+					resolve(image)
+				}
+			})
+		}
+
+		let width, height
+
+		let cuttingPoints = []
+
+		let imageCtx, UICanvasCtx
+
+		document.addEventListener('DOMContentLoaded', async (e) => {
+
+			const originalImage = await loadImage('test-photo.png') //'/test-photo2.jpg'
+
+			window.originalImage = originalImage
+			document.body.appendChild(originalImage)
+			
+			width = originalImage.getBoundingClientRect().width
+			height = originalImage.getBoundingClientRect().height
+
+			document.body.removeChild(originalImage)
+
+			const imageCanvas = document.querySelector('.originalImageCanvas')
+			imageCanvas.width = width
+			imageCanvas.height = height
+			imageCtx = imageCanvas.getContext('2d')
+
+			imageCtx.drawImage(originalImage, 0, 0)
+
+			const UICanvas = document.querySelector('.UICanvas')
+			UICanvas.width = width
+			UICanvas.height = height
+			UICanvasCtx = UICanvas.getContext('2d')
+			UICanvasCtx.clearRect(0, 0, width, height)
+			//ctx.drawImage(originalImage)
+		})
+
+		const drawLine = (pointA, pointB) => {
+			UICanvasCtx.strokeStyle = "red"
+			UICanvasCtx.lineWidth = 4
+			UICanvasCtx.beginPath()
+			UICanvasCtx.moveTo(pointA[0], pointA[1])
+			UICanvasCtx.lineTo(pointB[0], pointB[1])
+			UICanvasCtx.stroke()	
+		}
+
+		const drawLines = (points) => {
+			let i = 0
+			for (point of points) {
+				if (!points[i + 1]) {
+					return
+				}
+				drawLine(point, points[i + 1])
+				i++
+			}
+		}
+
+		const downloadCut = (cuttingPoints) => {
+			console.log('download cut')
+			// console.log(cuttingPoints)
+
+			const cuttingPointsAxeFixed = cuttingPoints.map((point) => {
+				return [point[0], point[1] * -1]
+			})
+
+			const boundingBoxPoints = getRectangleBoundingBox(cuttingPointsAxeFixed)
+
+			const boundingBoxPointsUnFixed = boundingBoxPoints.map((point) => {
+				return [point[0], point[1] * -1]
+			})
+
+			console.log(boundingBoxPointsUnFixed)
+
+			UICanvasCtx.clearRect(0, 0, width, height)
+			drawLines(boundingBoxPointsUnFixed.concat([boundingBoxPointsUnFixed[0]]))
+
+			return
+			const imageData = imageCtx.getImageData(
+				topLeft.x,
+				topLeft.y,
+				bottomRight.x - topLeft.x,
+				bottomRight.y - topLeft.y
+			)
+
+			console.log(imageData.data.length)
+
+			const canvas = document.createElement('canvas')
+			canvas.width = bottomRight.x - topLeft.x
+			canvas.height = bottomRight.y - topLeft.y
+
+			canvas.className = 'downloadCanvas'
+			//document.body.appendChild(canvas)
+			const context = canvas.getContext('2d')
+			context.putImageData(imageData, 0, 0)
+
+			const a = document.createElement('a')
+			a.href = canvas.toDataURL()
+			a.download = 'test.png'
+
+			document.body.appendChild(a)
+			a.click()
+			document.body.removeChild(a)
+			//document.body.removeChild(canvas)
+		}
+
+		document.querySelector('.UICanvas').addEventListener('click', async (e) => {
+			
+			cuttingPoints.push([
+				e.offsetX,
+				e.offsetY
+			])
+
+			if (cuttingPoints.length < 3) {
+				return
+			}
+
+			downloadCut(cuttingPoints)
+			cuttingPoints = []
+ 		})
+
+		document.querySelector('.UICanvas').addEventListener('mousemove', async (e) => {
+			UICanvasCtx.clearRect(0, 0, width, height)
+			
+			if (cuttingPoints.length > 0) {
+				
+				drawLines(cuttingPoints.concat([[e.offsetX, e.offsetY]]))
+			}
+		})
+
+	</script>
+</body>
+</html>
